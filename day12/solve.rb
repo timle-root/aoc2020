@@ -1,82 +1,37 @@
 #! /usr/bin/env ruby
 
-module Solver
-  HEADINGS = { 0 => "E", 90 => "S", 180 => "W", 270 => "N" }
+HEADINGS = { 0 => "E", 90 => "S", 180 => "W", 270 => "N" }
 
-  def self.solve_ship(input, heading)
-    east = 0
-    north = 0
+ROTATIONS = {
+  0   => ->(we, wn, e, n) { return  we,  wn, e, n },
+  90  => ->(we, wn, e, n) { return  wn, -we, e, n },
+  180 => ->(we, wn, e, n) { return -we, -wn, e, n },
+  270 => ->(we, wn, e, n) { return -wn,  we, e, n }
+}
 
-    input.each do |line|
-      command = line[0]
-      value = line[1..].to_i
-      command = HEADINGS[heading] if command == "F"
+HEADING_COMMANDS = {
+  "N" => ->(we, wn, value, e, n) { return we, wn, e, n + value },
+  "E" => ->(we, wn, value, e, n) { return we, wn, e + value, n },
+  "S" => ->(we, wn, value, e, n) { return we, wn, e, n - value },
+  "W" => ->(we, wn, value, e, n) { return we, wn, e - value, n },
+  "F" => ->(we, wn, value, e, n) { return HEADING_COMMANDS[HEADINGS[we]].call(we, wn, value, e, n) },
+  "R" => ->(we, wn, value, e, n) { return (we + value >= 360 ? we + value - 360 : we + value), wn , e, n },
+  "L" => ->(we, wn, value, e, n) { return HEADING_COMMANDS["R"].call(we, wn, 360 - value, e, n) },
+}
 
-      if command == "L"
-        command = "R"
-        value = 360 - value
-      end
-
-      case command
-      when "N"
-        north += value
-      when "S"
-        north -= value
-      when "E"
-        east += value
-      when "W"
-        east -= value
-      when "R"
-        heading += value
-        heading = heading - 360 if heading >= 360
-      end
-    end
-
-    east.abs + north.abs
-  end
-
-  def self.solve_waypoint(input, waypoint_east, waypoint_north)
-    east = 0
-    north = 0
-
-    input.each do |line|
-      command = line[0]
-      value = line[1..].to_i
-
-      if command == "L"
-        command = "R"
-        value = 360 - value
-      end
-
-      case command
-      when "N"
-        waypoint_north += value
-      when "S"
-        waypoint_north -= value
-      when "E"
-        waypoint_east += value
-      when "W"
-        waypoint_east -= value
-      when "R"
-        temp = waypoint_east
-        waypoint_east = waypoint_north if value == 90
-        waypoint_east = 0 - waypoint_north if value == 270
-        waypoint_east = 0 - waypoint_east if value == 180
-
-        waypoint_north = 0 - temp if value == 90
-        waypoint_north = temp if value == 270
-        waypoint_north = 0 - waypoint_north if value == 180
-      when "F"
-        east += waypoint_east * value
-        north += waypoint_north * value
-      end
-    end
-
-    east.abs + north.abs
-  end
-end
+WAYPOINT_COMMANDS = {
+  "N" => ->(we, wn, value, e, n) { return we, wn + value, e, n },
+  "E" => ->(we, wn, value, e, n) { return we + value, wn, e, n },
+  "S" => ->(we, wn, value, e, n) { return we, wn - value, e, n },
+  "W" => ->(we, wn, value, e, n) { return we - value, wn, e, n },
+  "F" => ->(we, wn, value, e, n) { return we, wn, (e + (we * value)), (n + (wn * value)) },
+  "R" => ->(we, wn, value, e, n) { return ROTATIONS[value].call(we, wn, e, n) },
+  "L" => ->(we, wn, value, e, n) { return WAYPOINT_COMMANDS["R"].call(we, wn, 360 - value, e, n) },
+}
 
 input = File.readlines("input.txt", :chomp => true)
 
-puts Solver.solve_ship(input, 0)
-puts Solver.solve_waypoint(input, 10, 1)
+solve = ->(data, commands, values) { data.reduce(values) { |values, line| values = commands[line[0]].call(values[0], values[1], line[1..].to_i, values[2], values[3]) }[2, 2].sum {|e| e.abs} }
+
+puts solve.call(input, HEADING_COMMANDS, [0, 0, 0, 0])
+puts solve.call(input, WAYPOINT_COMMANDS, [0, 0, 10, 1])
