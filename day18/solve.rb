@@ -1,6 +1,10 @@
 #! /usr/bin/env ruby
 
 module Solver
+  OPERATOR_PREF_ADD_FIRST = [["+"], ["*"]]
+  OPERATOR_PREF_LEFT_TO_RIGHT = [["+", "*"]]
+  OPERATOR_PREF_MULTI_FIRST = [["*"], ["+"]]
+
   def self.solve(expression, collector)
     collect = [[]]
     collect[0] = []
@@ -18,39 +22,35 @@ module Solver
       end
     end
 
-    collector.call(collect[0])
+    collector.call(collect[lopen])
   end
 
-  def self.process_left_to_right(sub_expression)
-    lop = sub_expression[0].to_i
+  def self.collect_with_precedence(sub_expression, preference)
+    reduce = []
+    
+    lop = 0
+    preference.each do |operators|
+      lop = sub_expression[0].to_i
+      (1..sub_expression.count - 1).step(2) do |n|
+        if operators.include?(sub_expression[n])
+          lop = lop.method(sub_expression[n]).(sub_expression[n+1].to_i)
+        else
+          reduce << lop
+          reduce << sub_expression[n]
+          lop = sub_expression[n+1].to_i
+        end
+      end
 
-    (1..sub_expression.count - 1).step(2) do |n|
-      lop *= sub_expression[n+1].to_i if sub_expression[n] == "*"
-      lop += sub_expression[n+1].to_i if sub_expression[n] == "+"
+      reduce << lop
+      sub_expression = reduce
     end
 
     lop
-  end
-
-  def self.process_add_first(sub_expression)
-    reduce = []
-    lop = sub_expression[0].to_i
-
-    (1..sub_expression.count - 1).step(2) do |n|
-      lop += sub_expression[n+1].to_i if sub_expression[n] == "+"
-      if sub_expression[n] == "*"
-        reduce << lop
-        reduce << sub_expression[n]
-        lop = sub_expression[n+1].to_i
-      end
-    end
-
-    reduce << lop
-    process_left_to_right(reduce)
   end
 end
 
 input = File.readlines("input.txt", :chomp => true)
 
-puts input.sum { |e| Solver.solve(e.tr(" ", ""), Proc.new {|x| Solver.process_left_to_right(x) }) }
-puts input.sum { |e| Solver.solve(e.tr(" ", ""), Proc.new {|x| Solver.process_add_first(x) }) }
+puts input.sum { |e| Solver.solve(e.tr(" ", ""), Proc.new {|x| Solver.collect_with_precedence(x, Solver::OPERATOR_PREF_LEFT_TO_RIGHT) }) }
+puts input.sum { |e| Solver.solve(e.tr(" ", ""), Proc.new {|x| Solver.collect_with_precedence(x, Solver::OPERATOR_PREF_ADD_FIRST) }) }
+puts input.sum { |e| Solver.solve(e.tr(" ", ""), Proc.new {|x| Solver.collect_with_precedence(x, Solver::OPERATOR_PREF_MULTI_FIRST) }) }
