@@ -1,52 +1,77 @@
 #! /usr/bin/env ruby
 
 module Solver
-  Piece = Struct.new(:id, :top, :bottom, :left, :right, :core, :corner, :edge, :placed, :matching_pieces) do
+  Piece = Struct.new(:id, :pixels, :corner, :edge, :placed, :matching_pieces) do
     def edges 
       return [top, bottom, left, right]
     end
 
-    def flip_right_left
-      temp = left
-      self.left = self.right
-      self.right = temp
-      self.top = self.top.reverse
-      self.bottom = self.bottom.reverse
+    def top
+      return pixels[0]
+    end
 
-      (0...core.count).each do |row|
-        core[row] = core[row].reverse
+    def bottom
+      return pixels.last
+    end
+
+    def left
+      left, _, _ = _left_right_core
+      left
+    end
+
+    def right
+      _, right, _ = _left_right_core
+      right
+    end
+
+    def core
+      _, _, core = _left_right_core
+      core
+    end
+
+    def flip_right_left
+      (0...pixels.count).each do |row|
+        pixels[row] = pixels[row].reverse
       end
     end
 
     def flip_top_bottom
-      temp = self.top
-      self.top = self.bottom
-      self.bottom = temp
-      self.left = self.left.reverse
-      self.right = self.right.reverse
-
-      half = core.count / 2
-      full = core.count - 1
+      half = pixels.count / 2
+      full = pixels.count - 1
       (0...half).each do |row|
-        temp = core[row]
-        core[row] = core[full - row]
-        core[full - row] = temp
+        temp = pixels[row]
+        pixels[row] = pixels[full - row]
+        pixels[full - row] = temp
       end
     end
 
     def rotate_left
-      temp = self.top.clone
-      self.top = self.right.clone
-      self.right = self.bottom.clone.reverse
-      self.bottom = self.left.clone
-      self.left = temp.clone.reverse
-
-      lookup = Marshal.load(Marshal.dump(core))
-      (0...core.count).each do |row|
-        (0...core.count).each do |column|
-          core[column][row] = lookup[row][(core.count - 1) - column]
+      lookup = Marshal.load(Marshal.dump(pixels))
+      (0...pixels.count).each do |row|
+        (0...pixels.count).each do |column|
+          pixels[column][row] = lookup[row][(pixels.count - 1) - column]
         end
       end
+    end
+
+    private
+
+    def _left_right_core
+      left = ""
+      right = ""
+      core = []
+
+      pixels.each_with_index do |line, index|
+        left << line[0]
+        right << line[-1]
+
+        next if index == 0
+        next if index == pixels.count - 1
+
+        core << line[1..-2]
+      end
+
+      return left, right, core
     end
   end
 
@@ -67,8 +92,6 @@ module Solver
 
     tiles.each do |key, value|
 
-      Piece.new(key, value[0], value.last, )
-      
       left = ""
       right = ""
       core = []
@@ -83,7 +106,7 @@ module Solver
         core << line[1..-2]
       end
 
-      pieces[key] = Piece.new(key, value[0], value.last, left, right, core, false, false, nil)
+      pieces[key] = Piece.new(key, value, false, false, nil)
       pieces[key].matching_pieces = []
     end
 
